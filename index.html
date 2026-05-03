@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drift</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #050508;
+      overflow: hidden;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    canvas { display: block; }
+
+    #hint {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(180, 215, 255, 0.28);
+      font-family: Georgia, serif;
+      font-size: 12px;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      transition: opacity 1.8s ease;
+      pointer-events: none;
+    }
+
+    #label {
+      position: fixed;
+      bottom: 28px; right: 32px;
+      color: rgba(180, 215, 255, 0.13);
+      font-family: Georgia, serif;
+      font-size: 10px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 1s ease;
+      pointer-events: none;
+    }
+
+    /* ── Panel ──────────────────────────────────────────────────────────────── */
+    #controls {
+      position: fixed;
+      bottom: 32px; left: 32px;
+      padding: 20px 22px;
+      background: rgba(5, 5, 12, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(140, 190, 255, 0.07);
+      border-radius: 10px;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+      cursor: default;
+    }
+
+    #controls.visible { opacity: 1; }
+
+    .panel-label {
+      color: rgba(180, 215, 255, 0.17);
+      font-family: Georgia, serif;
+      font-size: 9px;
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      margin-bottom: 11px;
+    }
+
+    /* ── Type grid ──────────────────────────────────────────────────────────── */
+    #type-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 7px 10px;
+      margin-bottom: 18px;
+    }
+
+    .type-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: opacity 0.35s ease;
+    }
+
+    .type-btn.off    { opacity: 0.16; }
+    .type-btn.locked { opacity: 0.07; cursor: default; }
+    .type-btn:not(.locked):hover { opacity: 1 !important; }
+
+    .type-dot {
+      width: 11px; height: 11px;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+    }
+
+    .type-btn:not(.locked):hover .type-dot { transform: scale(1.5); }
+
+    .type-name {
+      color: rgba(180, 215, 255, 0.28);
+      font-family: Georgia, serif;
+      font-size: 7.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ── Divider ────────────────────────────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: rgba(140, 190, 255, 0.07);
+      margin: 4px 0 16px;
+    }
+
+    /* ── Sliders ────────────────────────────────────────────────────────────── */
+    #sliders {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ctrl {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+
+    .ctrl label {
+      color: rgba(180, 215, 255, 0.28);
+      font-family: Georgia, serif;
+      font-size: 9.5px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      width: 52px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 112px;
+      height: 1px;
+      background: rgba(140, 190, 255, 0.17);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: rgba(200, 230, 255, 0.65);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    input[type=range]:hover::-webkit-slider-thumb {
+      background: rgba(225, 245, 255, 0.92);
+      transform: scale(1.35);
+    }
+
+    input[type=range]::-moz-range-track {
+      height: 1px;
+      background: rgba(140, 190, 255, 0.17);
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: rgba(200, 230, 255, 0.65);
+      border: none;
+    }
+
+    /* ── Progressive mode ───────────────────────────────────────────────────── */
+    #prog-section {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    #prog-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    #dur-row {
+      display: flex;
+      gap: 5px;
+      margin-left: 1px;
+    }
+
+    .mode-btn, .dur-btn {
+      background: none;
+      border: 1px solid rgba(180, 215, 255, 0.13);
+      color: rgba(180, 215, 255, 0.3);
+      font-family: Georgia, serif;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn {
+      font-size: 9px;
+      padding: 5px 10px;
+    }
+
+    .dur-btn {
+      font-size: 8.5px;
+      padding: 4px 8px;
+    }
+
+    .mode-btn:hover, .dur-btn:hover {
+      border-color: rgba(180, 215, 255, 0.32);
+      color: rgba(200, 230, 255, 0.6);
+    }
+
+    .mode-btn.active {
+      background: rgba(155, 225, 255, 0.1);
+      border-color: rgba(155, 225, 255, 0.38);
+      color: rgba(200, 238, 255, 0.85);
+    }
+
+    .dur-btn.sel {
+      border-color: rgba(155, 225, 255, 0.28);
+      color: rgba(200, 238, 255, 0.65);
+      background: rgba(155, 225, 255, 0.07);
+    }
+
+    #prog-bar-wrap {
+      height: 1px;
+      background: rgba(140, 190, 255, 0.1);
+      border-radius: 1px;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      overflow: hidden;
+    }
+
+    #prog-bar-wrap.visible { opacity: 1; }
+
+    #prog-bar {
+      height: 100%;
+      width: 0%;
+      background: rgba(155, 225, 255, 0.55);
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div id="hint">click to begin</div>
+<div id="label">click to pause</div>
+
+<div id="controls">
+  <div class="panel-label">types</div>
+  <div id="type-grid"></div>
+
+  <div class="divider"></div>
+  <div class="panel-label">controls</div>
+  <div id="sliders">
+    <div class="ctrl"><label>speed</label>  <input id="s-speed"  type="range" min="0.15" max="3"    step="0.01"  value="1"></div>
+    <div class="ctrl"><label>reach</label>  <input id="s-reach"  type="range" min="30"   max="145"  step="1"     value="78"></div>
+    <div class="ctrl"><label>space</label>  <input id="s-space"  type="range" min="0.1"  max="1"    step="0.01"  value="0.84"></div>
+    <div class="ctrl"><label>decay</label>  <input id="s-decay"  type="range" min="0.2"  max="3"    step="0.05"  value="1"></div>
+    <div class="ctrl"><label>trail</label>  <input id="s-trail"  type="range" min="0.04" max="0.42" step="0.005" value="0.18"></div>
+    <div class="ctrl"><label>volume</label> <input id="s-vol"    type="range" min="-36"  max="-3"   step="0.5"   value="-6"></div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="panel-label">mode</div>
+  <div id="prog-section">
+    <div id="prog-row">
+      <button id="prog-toggle" class="mode-btn">progressive</button>
+      <div id="dur-row">
+        <button class="dur-btn" data-min="5">5m</button>
+        <button class="dur-btn sel" data-min="10">10m</button>
+        <button class="dur-btn" data-min="20">20m</button>
+      </div>
+    </div>
+    <div id="prog-bar-wrap"><div id="prog-bar"></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script>
+// ── Canvas ────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+// ── Type definitions ──────────────────────────────────────────────────────────
+const TYPES = [
+  { name:'Crystal', rgb:[155,225,255], notes:['E5','G5','A5','B5','D6','E6','G6'],           osc:'sine',      env:{attack:0.02,decay:0.2, sustain:0.2, release:7},   vol:-18, sizeM:0.70 },
+  { name:'Bell',    rgb:[255,215, 90], notes:['C5','E5','G5','B5','D6','E6'],                 osc:'triangle',  env:{attack:0.01,decay:1.6, sustain:0,   release:3},   vol:-17, sizeM:1.00 },
+  { name:'Sub',     rgb:[175,100,255], notes:['C2','G2','A2','D3','E3','G3'],                 osc:'sine',      env:{attack:0.14,decay:0.5, sustain:0.55,release:5},   vol:-22, sizeM:2.10 },
+  { name:'Pulse',   rgb:[ 75,220,135], notes:['C4','D4','E4','G4','A4','C5'],                 osc:'square',    env:{attack:0.02,decay:0.4, sustain:0.15,release:2},   vol:-26, sizeM:1.00 },
+  { name:'Warm',    rgb:[255,170, 75], notes:['E4','G4','A4','B4','D5','E5'],                 osc:'triangle8', env:{attack:0.3, decay:0.5, sustain:0.6, release:5.5}, vol:-18, sizeM:1.05 },
+  { name:'Flute',   rgb:[120,235,210], notes:['G4','A4','B4','D5','E5','G5'],                 osc:'sine4',     env:{attack:0.08,decay:0.3, sustain:0.45,release:4},   vol:-18, sizeM:0.90 },
+  { name:'Shimmer', rgb:[235,242,255], notes:['C6','D6','E6','G6'],                           osc:'sine',      env:{attack:0.04,decay:0.15,sustain:0.1, release:5.5}, vol:-20, sizeM:0.52 },
+  { name:'Pluck',   rgb:[255,125, 70], notes:['E4','G4','A4','B4','D5','E5','G5'],            osc:'sawtooth',  env:{attack:0.005,decay:0.9,sustain:0,   release:1.5}, vol:-23, sizeM:0.85 },
+  { name:'Mist',    rgb:[200,175,255], notes:['A3','B3','D4','E4','G4','A4'],                 osc:'triangle',  env:{attack:0.65,decay:0.5, sustain:0.5, release:7.5}, vol:-19, sizeM:1.65 },
+  { name:'Ghost',   rgb:[155,235,185], notes:['B4','D5','E5','G5','A5','B5'],                 osc:'sine',      env:{attack:0.25,decay:0.4, sustain:0.35,release:9},   vol:-17, sizeM:1.20 },
+];
+
+TYPES.forEach(t => { t.active = true; t.locked = false; t.synth = null; });
+
+// Unlock order: Crystal → Ghost → Shimmer → Mist → Flute → Warm → Bell → Pluck → Pulse → Sub
+const UNLOCK_ORDER = [0, 9, 6, 8, 5, 4, 1, 7, 3, 2];
+
+// ── Type selector UI ──────────────────────────────────────────────────────────
+const typeGrid = document.getElementById('type-grid');
+const typeBtns = [];
+
+TYPES.forEach((t, i) => {
+  const btn = document.createElement('div');
+  btn.className = 'type-btn';
+
+  const dot = document.createElement('div');
+  dot.className   = 'type-dot';
+  dot.style.background = `rgba(${t.rgb.join(',')},0.78)`;
+  dot.style.boxShadow  = `0 0 5px rgba(${t.rgb.join(',')},0.42)`;
+
+  const nm = document.createElement('span');
+  nm.className   = 'type-name';
+  nm.textContent = t.name;
+
+  btn.appendChild(dot);
+  btn.appendChild(nm);
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (t.locked) return;
+    t.active = !t.active;
+    refreshBtn(i);
+  });
+
+  typeGrid.appendChild(btn);
+  typeBtns.push(btn);
+});
+
+function refreshBtn(i) {
+  const btn = typeBtns[i];
+  const t   = TYPES[i];
+  btn.classList.remove('off', 'locked');
+  if      (t.locked)   btn.classList.add('locked');
+  else if (!t.active)  btn.classList.add('off');
+}
+
+// ── Particles ─────────────────────────────────────────────────────────────────
+const COUNT    = 50;
+const COOLDOWN = 5000;
+const particles    = [];
+const pairCooldown = new Map();
+
+function makeParticle(i) {
+  const baseSpeed = 0.1 + Math.random() * 0.22;
+  const angle     = Math.random() * Math.PI * 2;
+  const typeId    = i % TYPES.length;
+  return {
+    x:     Math.random() * canvas.width,
+    y:     Math.random() * canvas.height,
+    bvx:   Math.cos(angle) * baseSpeed,
+    bvy:   Math.sin(angle) * baseSpeed,
+    r:     (1.0 + Math.random() * 1.2) * TYPES[typeId].sizeM,
+    lum:   0.4 + Math.random() * 0.6,
+    typeId,
+    flash: 0,
+  };
+}
+
+for (let i = 0; i < COUNT; i++) particles.push(makeParticle(i));
+
+// ── Ripples ───────────────────────────────────────────────────────────────────
+const ripples = [];
+
+const MAX_RIPPLES = 40;
+
+function spawnRipple(x, y, rgb, delay = 0) {
+  if (ripples.length >= MAX_RIPPLES) return;
+  setTimeout(() => {
+    if (ripples.length < MAX_RIPPLES)
+      ripples.push({ x, y, rgb, r: 5, maxR: 50 + Math.random() * 40, alpha: 0.72 });
+  }, delay);
+}
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+let audioReady = false;
+let reverbNode = null;
+let analyser   = null;
+
+async function initAudio() {
+  await Tone.start();
+
+  reverbNode = new Tone.Reverb({ decay: 13, preDelay: 0.1, wet: 0.84 });
+  await reverbNode.ready;
+
+  const delay = new Tone.PingPongDelay({ delayTime: '4n.', feedback: 0.22, wet: 0.2 });
+  delay.connect(reverbNode);
+
+  analyser = new Tone.Analyser('waveform', 512);
+  reverbNode.connect(analyser);
+  analyser.toDestination();
+
+  for (const t of TYPES) {
+    t.synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: t.osc },
+      envelope:   { ...t.env },
+      volume:     t.vol,
+    });
+    t.synth.maxPolyphony = 6; // cap voices per type to prevent buildup
+    t.synth.connect(delay);
+  }
+
+  audioReady = true;
+}
+
+function triggerType(typeId, velocity) {
+  const t = TYPES[typeId];
+  if (!t.active || !t.synth) return;
+  const note = t.notes[Math.floor(Math.random() * t.notes.length)];
+  t.synth.triggerAttackRelease(note, '8n', Tone.now(), velocity);
+}
+
+// ── Progressive mode ──────────────────────────────────────────────────────────
+let progMode     = false;
+let progDurMs    = 10 * 60 * 1000;
+let progStart    = 0;
+let progTimers   = [];
+
+const progToggle  = document.getElementById('prog-toggle');
+const progBarWrap = document.getElementById('prog-bar-wrap');
+const progBar     = document.getElementById('prog-bar');
+
+function startProg() {
+  if (!running) return; // require audio to be started first
+
+  progMode  = true;
+  progStart = Date.now();
+
+  // Lock and deactivate everything
+  TYPES.forEach((t, i) => { t.active = false; t.locked = true; refreshBtn(i); });
+
+  // Unlock Crystal immediately
+  unlockType(0, true);
+
+  // Schedule remaining unlocks evenly across the duration
+  const step = progDurMs / (UNLOCK_ORDER.length - 1);
+  for (let i = 1; i < UNLOCK_ORDER.length; i++) {
+    const id    = UNLOCK_ORDER[i];
+    const delay = Math.round(i * step);
+    progTimers.push(setTimeout(() => unlockType(id), delay));
+  }
+
+  progToggle.classList.add('active');
+  progBarWrap.classList.add('visible');
+}
+
+function stopProg() {
+  progTimers.forEach(clearTimeout);
+  progTimers = [];
+  progMode   = false;
+  progStart  = 0;
+
+  // Unlock everything
+  TYPES.forEach((t, i) => { t.locked = false; refreshBtn(i); });
+
+  progToggle.classList.remove('active');
+  progBarWrap.classList.remove('visible');
+  progBar.style.width = '0%';
+}
+
+function unlockType(typeId, silent = false) {
+  const t = TYPES[typeId];
+  t.locked = false;
+  t.active = true;
+  refreshBtn(typeId);
+
+  // Flash the particles of this type
+  particles.forEach(p => { if (p.typeId === typeId) p.flash = 0.9; });
+
+  // Briefly make the button fully bright then settle
+  const btn = typeBtns[typeId];
+  btn.style.transition = 'opacity 0s';
+  btn.style.opacity    = '1';
+  setTimeout(() => {
+    btn.style.transition = '';
+    btn.style.opacity    = '';
+  }, 600);
+}
+
+progToggle.addEventListener('click', e => {
+  e.stopPropagation();
+  if (progMode) stopProg();
+  else          startProg();
+});
+
+document.querySelectorAll('.dur-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (progMode) return; // don't change duration mid-run
+    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    progDurMs = parseInt(btn.dataset.min) * 60 * 1000;
+  });
+});
+
+// ── Sliders ───────────────────────────────────────────────────────────────────
+const params = { speed: 1, reach: 78, trail: 0.18 };
+
+// Token bucket — limits audio triggers to MAX_TRIG_PER_SEC globally
+const MAX_TRIG_PER_SEC = 5;
+let trigTokens   = MAX_TRIG_PER_SEC;
+let lastTokensAt = 0;
+
+document.getElementById('controls').addEventListener('click', e => e.stopPropagation());
+
+document.getElementById('s-speed').addEventListener('input', e => { params.speed = parseFloat(e.target.value); });
+document.getElementById('s-reach').addEventListener('input', e => { params.reach = parseFloat(e.target.value); });
+document.getElementById('s-space').addEventListener('input', e => { if (reverbNode) reverbNode.wet.value = parseFloat(e.target.value); });
+document.getElementById('s-decay').addEventListener('input', e => {
+  const m = parseFloat(e.target.value);
+  TYPES.forEach(t => { if (t.synth) t.synth.set({ envelope: { release: t.env.release * m } }); });
+});
+document.getElementById('s-trail').addEventListener('input', e => { params.trail = parseFloat(e.target.value); });
+document.getElementById('s-vol').addEventListener('input',   e => { Tone.getDestination().volume.value = parseFloat(e.target.value); });
+
+// ── Interaction ───────────────────────────────────────────────────────────────
+let running = false;
+const hint  = document.getElementById('hint');
+const label = document.getElementById('label');
+const panel = document.getElementById('controls');
+
+document.addEventListener('click', async () => {
+  if (!audioReady) {
+    await initAudio();
+    running             = true;
+    hint.style.opacity  = '0';
+    label.style.opacity = '1';
+    panel.classList.add('visible');
+  } else if (running) {
+    running             = false;
+    hint.textContent    = 'click to resume';
+    hint.style.opacity  = '1';
+    label.style.opacity = '0';
+  } else {
+    running             = true;
+    hint.style.opacity  = '0';
+    label.style.opacity = '1';
+  }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function lerpRgb(a, b) {
+  return [Math.round((a[0]+b[0])/2), Math.round((a[1]+b[1])/2), Math.round((a[2]+b[2])/2)];
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+let amp = 0;
+
+function draw() {
+  requestAnimationFrame(draw);
+
+  // Amplitude
+  if (analyser && running) {
+    const d = analyser.getValue();
+    let s = 0; for (let i = 0; i < d.length; i++) s += d[i]*d[i];
+    amp += (Math.sqrt(s / d.length) - amp) * 0.05;
+  } else { amp *= 0.96; }
+
+  // Progress bar
+  if (progMode && progStart > 0) {
+    const pct = Math.min(100, ((Date.now() - progStart) / progDurMs) * 100);
+    progBar.style.width = pct + '%';
+    if (pct >= 100) stopProg();
+  }
+
+  // Trail
+  ctx.fillStyle = `rgba(5,5,8,${params.trail})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const now = Date.now();
+
+  // Refill trigger tokens based on elapsed time
+  const elapsed = (now - lastTokensAt) / 1000;
+  trigTokens   = Math.min(MAX_TRIG_PER_SEC, trigTokens + elapsed * MAX_TRIG_PER_SEC);
+  lastTokensAt = now;
+
+  // ── Update + collide ────────────────────────────────────────────────────────
+  if (running) {
+    for (let i = 0; i < particles.length; i++) {
+      const p  = particles[i];
+      const pt = TYPES[p.typeId];
+
+      p.x += p.bvx * params.speed;
+      p.y += p.bvy * params.speed;
+      if (p.x < -16) p.x = canvas.width  + 16;
+      if (p.x > canvas.width  + 16) p.x = -16;
+      if (p.y < -16) p.y = canvas.height + 16;
+      if (p.y > canvas.height + 16) p.y = -16;
+      p.flash *= 0.87;
+
+      for (let j = i + 1; j < particles.length; j++) {
+        const q  = particles[j];
+        const qt = TYPES[q.typeId];
+        if (!pt.active && !qt.active) continue;
+
+        const dx = q.x - p.x;
+        const dy = q.y - p.y;
+        const d  = Math.sqrt(dx*dx + dy*dy);
+        if (d > params.reach) continue;
+
+        const key  = i * COUNT + j;
+        const last = pairCooldown.get(key) || 0;
+        if (now - last < COOLDOWN) continue;
+        pairCooldown.set(key, now);
+
+        const vel = 0.28 + (1 - d / params.reach) * 0.52;
+        if (trigTokens >= 1) {
+          trigTokens -= 1;
+          triggerType(p.typeId, vel);
+          if (Math.random() < 0.4) {
+            const qId = q.typeId;
+            setTimeout(() => { if (running) triggerType(qId, vel * 0.6); }, 65);
+          }
+        }
+
+        p.flash = 1.0; q.flash = 0.75;
+        const mx = (p.x+q.x)/2, my = (p.y+q.y)/2;
+        const rgb = lerpRgb(pt.rgb, qt.rgb);
+        spawnRipple(mx, my, rgb);
+        spawnRipple(mx, my, rgb, 135);
+      }
+    }
+  }
+
+  // ── Lines ───────────────────────────────────────────────────────────────────
+  const LINE_R = Math.max(params.reach, 115);
+  for (let i = 0; i < particles.length; i++) {
+    const a = particles[i]; const at = TYPES[a.typeId];
+    for (let j = i + 1; j < particles.length; j++) {
+      const b = particles[j]; const bt = TYPES[b.typeId];
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const d  = Math.sqrt(dx*dx+dy*dy);
+      if (d > LINE_R) continue;
+
+      const t      = 1 - d / LINE_R;
+      const flash  = Math.max(a.flash, b.flash);
+      const dimMul = (at.active && bt.active) ? 1 : (!at.active && !bt.active) ? 0.05 : 0.2;
+      const alpha  = t*t*(0.09 + flash*0.5)*dimMul;
+      if (alpha < 0.004) continue;
+
+      const [r,g,bl] = lerpRgb(at.rgb, bt.rgb);
+      ctx.beginPath();
+      ctx.strokeStyle = `rgba(${r},${g},${bl},${alpha})`;
+      ctx.lineWidth   = 0.4 + flash * 0.9;
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+  }
+
+  // ── Ripples ─────────────────────────────────────────────────────────────────
+  for (let i = ripples.length-1; i >= 0; i--) {
+    const rip = ripples[i];
+    rip.r    += (rip.maxR - rip.r) * 0.055;
+    rip.alpha *= 0.952;
+    if (rip.alpha < 0.012) { ripples.splice(i, 1); continue; }
+    const [r,g,b] = rip.rgb;
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(${r},${g},${b},${rip.alpha})`;
+    ctx.lineWidth   = 0.75;
+    ctx.arc(rip.x, rip.y, rip.r, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  // ── Stars ───────────────────────────────────────────────────────────────────
+  for (const p of particles) {
+    const t          = TYPES[p.typeId];
+    const [r,g,b]    = t.rgb;
+    const f          = p.flash;
+    const base       = t.active ? (p.lum * 0.55 + amp * 3.5) : 0.1;
+    const alpha      = Math.min(1, base + f * 0.55);
+    const radius     = p.r * (1 + f * 1.8);
+
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha*0.08})`;
+    ctx.arc(p.x, p.y, radius*6, 0, Math.PI*2); ctx.fill();
+
+    if (f > 0.05) {
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${r},${g},${b},${f*0.2})`;
+      ctx.arc(p.x, p.y, radius*3, 0, Math.PI*2); ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+    ctx.arc(p.x, p.y, radius, 0, Math.PI*2); ctx.fill();
+  }
+}
+
+draw();
+</script>
+</body>
+</html>
